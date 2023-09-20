@@ -7,9 +7,27 @@ A React Native application built with Expo showcasing the Time-Locked Vault usin
 #### Prerequisites
 
 1. Make sure you have [Node.js](https://nodejs.org/) installed.
-2. Install the Expo CLI: `npm install -g expo-cli`.
+2. Install the Expo CLI: 
+    ```bash
+    npm install -g expo-cli
+    ```
 
-#### Steps
+#### To run on an iOS or Android Simulator/Emulator:
+
+**For iOS**:
+
+1. Install [Xcode](https://apps.apple.com/app/xcode/id497799835) from the Mac App Store.
+2. Once installed, open Xcode to install the additional required components.
+3. Ensure you have iOS simulators installed. You can manage and install simulators via Xcode by navigating to `Xcode > Preferences > Components`.
+
+**For Android**:
+
+4. Install [Android Studio](https://developer.android.com/studio).
+5. Make sure you have an Android emulator set up. You can set one up via the AVD Manager in Android Studio.
+
+**Note**: You don't need Xcode or Android Studio if you plan to run the app only on a physical device.
+
+#### Running the app:
 
 1. Clone this repository:
     ```bash
