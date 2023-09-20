@@ -27,23 +27,27 @@ export default function VaultSettings({
   const lockBlocksRef = useRef(null);
 
   const handleOKPress = () => {
+    let errorMessages = [];
+
     // Validation for Bitcoin address
     if (!validateAddress(panicAddr, network)) {
-      Alert.alert(
-        "Invalid Address",
+      errorMessages.push(
         "The provided Bitcoin address is invalid. Reverting to previous value.",
       );
       setPanicAddr(defPanicAddr);
-      return;
     }
 
     // Validation for lockBlocks
     if (!Number.isInteger(lockBlocks) || lockBlocks < 1) {
-      Alert.alert(
-        "Invalid Block Value",
+      errorMessages.push(
         "The block value must be an integer greater than or equal to 1. Reverting to previous value.",
       );
       setLockBlocks(defLockBlocks);
+    }
+
+    // If any errors, display them
+    if (errorMessages.length > 0) {
+      Alert.alert("Invalid Inputs", errorMessages.join("\n\n"));
       return;
     }
 

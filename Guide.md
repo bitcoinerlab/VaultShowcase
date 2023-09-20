@@ -51,6 +51,7 @@ npm run updatelocaldiscovery
 ```bash
 #QR codes
 npm install react-native-qrcode-svg
+npx expo install react-native-svg
 ```
 
 ```bash
@@ -75,4 +76,21 @@ Create init.js and import it from App.js
       onUsed: (expression) =>
         console.log(`vault address in the chain: ${expression}`),
     });
+```
+
+## Run on Expo
+
+```bash
+npx expo start -c
+```
+
+
+## Install on device
+```bash
+#To register your devices
+eas device:create
+#To debug using expo and dev server using a device:
+eas build --profile development --platform ios
+#To build an image that can be installed on a device:
+eas build --profile preview --platform ios
 ```
