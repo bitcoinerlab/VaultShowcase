@@ -27,6 +27,7 @@ export function createVault({
   });
 
   const psbtVault = new Psbt({ network });
+  //Add the inputs to psbtVault:
   const vaultInputDescriptors = [];
   utxos.forEach((utxo) => {
     const { expression, index, vout, txHex } = discovery.getScriptPubKeysByUtxo(
@@ -36,6 +37,7 @@ export function createVault({
     const inputIndex = descriptor.updatePsbt({ psbt: psbtVault, txHex, vout });
     vaultInputDescriptors[inputIndex] = descriptor;
   });
+  //Add the output to psbtVault:
   const vaultBalance = balance - FEE;
   const vaultAddress = vaultDescriptor.getAddress();
   psbtVault.addOutput({ address: vaultAddress, value: vaultBalance });
@@ -70,7 +72,9 @@ export function createVault({
   });
   const triggerAddress = triggerDescriptorPanicPath.getAddress();
   const psbtTrigger = new Psbt({ network });
+  //Add the input to psbtTrigger:
   vaultDescriptor.updatePsbt({ psbt: psbtTrigger, vout: 0, txHex: vaultTxHex });
+  //Add the output to psbtTrigger:
   const triggerBalance = balance - 2 * FEE;
   psbtTrigger.addOutput({ address: triggerAddress, value: triggerBalance });
   signECPair({ psbt: psbtTrigger, ecpair: vaultPair });
@@ -78,11 +82,13 @@ export function createVault({
   const triggerTxHex = psbtTrigger.extractTransaction().toHex();
 
   const psbtPanic = new Psbt({ network });
+  //Add the input to psbtPanic:
   triggerDescriptorPanicPath.updatePsbt({
     psbt: psbtPanic,
     txHex: triggerTxHex,
     vout: 0,
   });
+  //Add the output to psbtPanic:
   psbtPanic.addOutput({ address: panicAddr, value: balance - 3 * FEE });
   signECPair({ psbt: psbtPanic, ecpair: panicPair });
   triggerDescriptorPanicPath.finalizePsbtInput({ index: 0, psbt: psbtPanic });
@@ -96,11 +102,13 @@ export function createVault({
     signersPubKeys: [unvaultKey],
   });
   const psbtUnvault = new Psbt({ network });
+  //Add the input to psbtUnvault:
   triggerDescriptorUnvaultPath.updatePsbt({
     psbt: psbtUnvault,
     txHex: triggerTxHex,
     vout: 0,
   });
+  //Add the output to psbtUnvault:
   psbtUnvault.addOutput({
     address: nextInternalAddress,
     value: balance - 3 * FEE,
