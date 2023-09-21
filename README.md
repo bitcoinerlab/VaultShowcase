@@ -21,7 +21,7 @@ A React Native application built with Expo showcasing the Time-Locked Vault usin
 
 3. Start the Expo development server:
     ```bash
-    npx expo start
+    npx expo start -c
     ```
 
     This will start the Metro Bundler and display a QR code in your terminal.

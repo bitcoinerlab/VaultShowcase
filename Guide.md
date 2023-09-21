@@ -10,7 +10,7 @@ Assumes FEE 500 sats for all txs. This is particularly bad for the trigger & unv
 ```bash
 npx create-expo-app Vault
 cd Vault
-npx expo start
+npx expo start -c
 ```
 
 ```bash
