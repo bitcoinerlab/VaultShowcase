@@ -62,7 +62,7 @@ export function createVault({
     .replace("@unvaultKey", unvaultKey.toString("hex"))
     .replace("@panicKey", panicKey.toString("hex"))})`;
 
-  //Create the panic output descriptor
+  //Create the trigger output descriptor instance spendable by Panic
   const triggerDescriptorPanicPath = new Descriptor({
     expression: triggerExpression,
     network,
@@ -88,8 +88,8 @@ export function createVault({
   triggerDescriptorPanicPath.finalizePsbtInput({ index: 0, psbt: psbtPanic });
   const panicTxHex = psbtPanic.extractTransaction().toHex();
 
-  //Create the unvault output descriptor. This simply consolidates a utxo into
-  //an internal address compatible with BIP39+BIP84 wallets
+  //Create the trigger output descriptor instance spendable by Unvault. Consolidates
+  //a utxo into an internal address compatible with BIP39+BIP84 wallets
   const triggerDescriptorUnvaultPath = new Descriptor({
     expression: triggerExpression,
     network,
