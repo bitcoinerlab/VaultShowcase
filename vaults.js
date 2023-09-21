@@ -63,12 +63,12 @@ export function createVault({
     .replace("@panicKey", panicKey.toString("hex"))})`;
 
   //Create the panic output descriptor
-  const panicDescriptor = new Descriptor({
+  const triggerDescriptorPanicPath = new Descriptor({
     expression: triggerExpression,
     network,
     signersPubKeys: [panicKey],
   });
-  const triggerAddress = panicDescriptor.getAddress();
+  const triggerAddress = triggerDescriptorPanicPath.getAddress();
   const psbtTrigger = new Psbt({ network });
   vaultDescriptor.updatePsbt({ psbt: psbtTrigger, vout: 0, txHex: vaultTxHex });
   const triggerBalance = balance - 2 * FEE;
@@ -78,21 +78,25 @@ export function createVault({
   const triggerTxHex = psbtTrigger.extractTransaction().toHex();
 
   const psbtPanic = new Psbt({ network });
-  panicDescriptor.updatePsbt({ psbt: psbtPanic, txHex: triggerTxHex, vout: 0 });
+  triggerDescriptorPanicPath.updatePsbt({
+    psbt: psbtPanic,
+    txHex: triggerTxHex,
+    vout: 0,
+  });
   psbtPanic.addOutput({ address: panicAddr, value: balance - 3 * FEE });
   signECPair({ psbt: psbtPanic, ecpair: panicPair });
-  panicDescriptor.finalizePsbtInput({ index: 0, psbt: psbtPanic });
+  triggerDescriptorPanicPath.finalizePsbtInput({ index: 0, psbt: psbtPanic });
   const panicTxHex = psbtPanic.extractTransaction().toHex();
 
   //Create the unvault output descriptor. This simply consolidates a utxo into
   //an internal address compatible with BIP39+BIP84 wallets
-  const unvaultDescriptor = new Descriptor({
+  const triggerDescriptorUnvaultPath = new Descriptor({
     expression: triggerExpression,
     network,
     signersPubKeys: [unvaultKey],
   });
   const psbtUnvault = new Psbt({ network });
-  unvaultDescriptor.updatePsbt({
+  triggerDescriptorUnvaultPath.updatePsbt({
     psbt: psbtUnvault,
     txHex: triggerTxHex,
     vout: 0,
@@ -102,7 +106,10 @@ export function createVault({
     value: balance - 3 * FEE,
   });
   signECPair({ psbt: psbtUnvault, ecpair: unvaultPair });
-  unvaultDescriptor.finalizePsbtInput({ index: 0, psbt: psbtUnvault });
+  triggerDescriptorUnvaultPath.finalizePsbtInput({
+    index: 0,
+    psbt: psbtUnvault,
+  });
   const unvaultTxHex = psbtUnvault.extractTransaction().toHex();
 
   return {
