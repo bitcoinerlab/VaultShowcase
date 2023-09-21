@@ -1,6 +1,6 @@
 ## VaultShowcase
 
-A React Native application built with Expo showcasing the Time-Locked Vault using the tech stack provided by @bitcoinerlab.
+A React Native application built with Expo showcasing a Time-Lock Vault using the tech stack provided by @bitcoinerlab.
 
 ### Prerequisites
 
