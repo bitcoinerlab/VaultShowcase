@@ -375,7 +375,7 @@ Handle with care. Confidentiality is key.
               network={network}
               onNewValues={async ({ panicAddr, lockBlocks }) => {
                 setDefPanicAddr(panicAddr);
-                setDefLockBlocks(lockBlocks);
+                setDefLockBlocks(String(lockBlocks));
               }}
             />
             <View style={styles.factoryReset}>
@@ -405,10 +405,7 @@ Handle with care. Confidentiality is key.
               network={network}
               onNewValues={async ({ panicAddr, lockBlocks }) => {
                 setIsVaultSetUp(false);
-                await handleVaultFunds({
-                  panicAddr,
-                  lockBlocks: parseInt(lockBlocks, 10),
-                });
+                await handleVaultFunds({ panicAddr, lockBlocks });
               }}
               onCancel={() => setIsVaultSetUp(false)}
             />

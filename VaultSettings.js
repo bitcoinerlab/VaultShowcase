@@ -21,7 +21,7 @@ export default function VaultSettings({
   isWrapped = false,
 }) {
   const [panicAddr, setPanicAddr] = useState(defPanicAddr);
-  const [lockBlocks, setLockBlocks] = useState(defLockBlocks);
+  const [lockBlocks, setLockBlocks] = useState(Number(defLockBlocks));
 
   const panicAddrRef = useRef(null);
   const lockBlocksRef = useRef(null);
@@ -42,12 +42,12 @@ export default function VaultSettings({
       errorMessages.push(
         "The block value must be an integer greater than or equal to 1. Reverting to previous value.",
       );
-      setLockBlocks(defLockBlocks);
+      setLockBlocks(Number(defLockBlocks));
     }
 
     // If any errors, display them
     if (errorMessages.length > 0) {
-      Alert.alert("Invalid Inputs", errorMessages.join("\n\n"));
+      Alert.alert("Invalid Values", errorMessages.join("\n\n"));
       return;
     }
 
