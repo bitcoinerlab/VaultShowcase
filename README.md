@@ -48,3 +48,20 @@ If you'd like to run the app on a simulator or emulator, follow these additional
 6. **To run the app on a simulator/emulator**:
     - **iOS Simulator**: Press `i` in the terminal where the Expo server is running.
     - **Android Emulator**: Press `a` in the terminal (ensure you have an emulator set up through Android Studio).
+
+### Local Development
+
+In order to be able to use native tcp sockets (for electrum) we need to depart from Expo Go and use  local development tools.
+
+Still, it is possible to use expo tools without ejecting completelly.
+
+For that, builds must be done locally, though.
+
+For Macos, install:
+Ruby:
+https://rvm.io/rvm/install
+fastlane (depends on ruby)
+
+read this too in cause of trouble:
+https://expo.canny.io/feature-requests/p/support-raw-tcp-sockets
+

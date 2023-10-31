@@ -2,7 +2,7 @@ const FEE = 500;
 import { Psbt, address, networks } from "bitcoinjs-lib";
 import * as secp256k1 from "@bitcoinerlab/secp256k1";
 import * as descriptors from "@bitcoinerlab/descriptors";
-const { Descriptor, ECPair } = descriptors.DescriptorsFactory(secp256k1);
+const { Output, ECPair } = descriptors.DescriptorsFactory(secp256k1);
 import { EsploraExplorer } from "@bitcoinerlab/explorer";
 import { DiscoveryFactory } from "@bitcoinerlab/discovery";
 
@@ -20,104 +20,142 @@ export function createVault({
   balance,
   discovery,
 }) {
-  const vaultPair = ECPair.makeRandom();
-  const vaultDescriptor = new Descriptor({
-    expression: `wpkh(${vaultPair.publicKey.toString("hex")})`,
-    network,
-  });
+  ////////////////////////////////
+  //Prepare the Vault Tx:
+  ////////////////////////////////
 
   const psbtVault = new Psbt({ network });
   //Add the inputs to psbtVault:
-  const vaultInputDescriptors = [];
+  const vaultFinalizers = [];
   utxos.forEach((utxo) => {
-    const { expression, index, vout, txHex } = discovery.getScriptPubKeysByUtxo(
-      { utxo, network },
-    )[0];
-    const descriptor = new Descriptor({ expression, index, network });
-    const inputIndex = descriptor.updatePsbt({ psbt: psbtVault, txHex, vout });
-    vaultInputDescriptors[inputIndex] = descriptor;
+    const [txId, strVout] = utxo.split(":");
+    const output = new Output({
+      ...discovery.getDescriptor({ utxo }),
+      network,
+    });
+    //Add the utxo as input of psbtVault:
+    const inputFinalizer = output.updatePsbtAsInput({
+      psbt: psbtVault,
+      txHex: discovery.getTxHex({ txId }),
+      vout: Number(strVout),
+    });
+    vaultFinalizers.push(inputFinalizer);
   });
   //Add the output to psbtVault:
-  const vaultBalance = balance - FEE;
-  const vaultAddress = vaultDescriptor.getAddress();
-  psbtVault.addOutput({ address: vaultAddress, value: vaultBalance });
-  signBIP32({ psbt: psbtVault, masterNode });
-
-  descriptors.finalizePsbt({
-    psbt: psbtVault,
-    descriptors: vaultInputDescriptors,
+  const vaultPair = ECPair.makeRandom();
+  const vaultOutput = new Output({
+    descriptor: `wpkh(${vaultPair.publicKey.toString("hex")})`,
+    network,
   });
-  const vaultTxHex = psbtVault.extractTransaction().toHex();
+  const vaultBalance = balance - FEE;
+  vaultOutput.updatePsbtAsOutput({ psbt: psbtVault, value: vaultBalance });
+  //Sign
+  signBIP32({ psbt: psbtVault, masterNode });
+  //Finalize
+  vaultFinalizers.forEach((finalizer) => finalizer({ psbt: psbtVault }));
 
-  const older = olderEncode({ blocks: lockBlocks });
+  ////////////////////////////////
+  //Prepare the Trigger Unvault Tx
+  ////////////////////////////////
+
+  const psbtTrigger = new Psbt({ network });
+  const vaultTxHex = psbtVault.extractTransaction().toHex();
+  //Add the input (vaultOutput) to psbtTrigger as input:
+  const triggerInputFinalizer = vaultOutput.updatePsbtAsInput({
+    psbt: psbtTrigger,
+    txHex: vaultTxHex,
+    vout: 0,
+  });
+  //Prepare the output...
   const POLICY = (older) =>
     `or(pk(@panicKey),99@and(pk(@unvaultKey),older(${older})))`;
+  const older = olderEncode({ blocks: lockBlocks });
   const { miniscript, issane } = compilePolicy(POLICY(older));
   if (!issane) throw new Error("Policy not sane");
 
   const panicPair = ECPair.makeRandom();
-  const panicKey = panicPair.publicKey;
+  const panicPubKey = panicPair.publicKey;
   const unvaultPair = ECPair.makeRandom();
-  const unvaultKey = unvaultPair.publicKey;
+  const unvaultPubKey = unvaultPair.publicKey;
 
-  const triggerExpression = `wsh(${miniscript
-    .replace("@unvaultKey", unvaultKey.toString("hex"))
-    .replace("@panicKey", panicKey.toString("hex"))})`;
+  const triggerDescriptor = `wsh(${miniscript
+    .replace("@unvaultKey", unvaultPubKey.toString("hex"))
+    .replace("@panicKey", panicPubKey.toString("hex"))})`;
 
-  //Create the trigger output descriptor instance spendable by Panic
-  const triggerDescriptorPanicPath = new Descriptor({
-    expression: triggerExpression,
-    network,
-    signersPubKeys: [panicKey],
-  });
-  const triggerAddress = triggerDescriptorPanicPath.getAddress();
-  const psbtTrigger = new Psbt({ network });
-  //Add the input to psbtTrigger:
-  vaultDescriptor.updatePsbt({ psbt: psbtTrigger, vout: 0, txHex: vaultTxHex });
+  const triggerOutput = new Output({ descriptor: triggerDescriptor, network });
   //Add the output to psbtTrigger:
-  const triggerBalance = balance - 2 * FEE;
-  psbtTrigger.addOutput({ address: triggerAddress, value: triggerBalance });
+  const triggerBalance = vaultBalance - FEE;
+  triggerOutput.updatePsbtAsOutput({
+    psbt: psbtTrigger,
+    value: triggerBalance,
+  });
+  //Sign
   signECPair({ psbt: psbtTrigger, ecpair: vaultPair });
-  vaultDescriptor.finalizePsbtInput({ index: 0, psbt: psbtTrigger });
+  //Finalize
+  triggerInputFinalizer({ psbt: psbtTrigger });
   const triggerTxHex = psbtTrigger.extractTransaction().toHex();
 
+  //////////////////////
+  //Prepare the Panic Tx
+  //////////////////////
+
   const psbtPanic = new Psbt({ network });
+  //Create the trigger output descriptor instance spendable by Panic
+  const triggerOutputPanicPath = new Output({
+    descriptor: triggerDescriptor,
+    network,
+    signersPubKeys: [panicPubKey],
+  });
   //Add the input to psbtPanic:
-  triggerDescriptorPanicPath.updatePsbt({
+  const panicInputFinalizer = triggerOutputPanicPath.updatePsbtAsInput({
     psbt: psbtPanic,
     txHex: triggerTxHex,
     vout: 0,
   });
   //Add the output to psbtPanic:
-  psbtPanic.addOutput({ address: panicAddr, value: balance - 3 * FEE });
-  signECPair({ psbt: psbtPanic, ecpair: panicPair });
-  triggerDescriptorPanicPath.finalizePsbtInput({ index: 0, psbt: psbtPanic });
-  const panicTxHex = psbtPanic.extractTransaction().toHex();
-
-  //Create the trigger output descriptor instance spendable by Unvault. Consolidates
-  //a utxo into an internal address compatible with BIP39+BIP84 wallets
-  const triggerDescriptorUnvaultPath = new Descriptor({
-    expression: triggerExpression,
-    network,
-    signersPubKeys: [unvaultKey],
+  new Output({ descriptor: `addr(${panicAddr})`, network }).updatePsbtAsOutput({
+    psbt: psbtPanic,
+    value: triggerBalance - FEE,
   });
+  //Sign
+  signECPair({ psbt: psbtPanic, ecpair: panicPair });
+  //Finalize
+  panicInputFinalizer({ psbt: psbtPanic });
+
+  ////////////////////////
+  //Prepare the Unvault Tx
+  ////////////////////////
+
   const psbtUnvault = new Psbt({ network });
+  //Create the trigger output descriptor instance spendable by Unvault.
+  const triggerOutputUnvaultPath = new Output({
+    descriptor: triggerDescriptor,
+    signersPubKeys: [unvaultPubKey],
+    network,
+  });
   //Add the input to psbtUnvault:
-  triggerDescriptorUnvaultPath.updatePsbt({
+  const unvaultInputFinalizer = triggerOutputUnvaultPath.updatePsbtAsInput({
     psbt: psbtUnvault,
     txHex: triggerTxHex,
     vout: 0,
   });
   //Add the output to psbtUnvault:
-  psbtUnvault.addOutput({
-    address: nextInternalAddress,
-    value: balance - 3 * FEE,
-  });
-  signECPair({ psbt: psbtUnvault, ecpair: unvaultPair });
-  triggerDescriptorUnvaultPath.finalizePsbtInput({
-    index: 0,
+  //Consolidates into an internal BIP84 address
+  new Output({
+    descriptor: `addr(${nextInternalAddress})`,
+    network,
+  }).updatePsbtAsOutput({
     psbt: psbtUnvault,
+    value: triggerBalance - FEE,
   });
+  //Sign
+  signECPair({ psbt: psbtUnvault, ecpair: unvaultPair });
+  //Finalize
+  unvaultInputFinalizer({ psbt: psbtUnvault });
+
+  const vaultAddress = vaultOutput.getAddress();
+  const triggerAddress = triggerOutput.getAddress();
+  const panicTxHex = psbtPanic.extractTransaction().toHex();
   const unvaultTxHex = psbtUnvault.extractTransaction().toHex();
 
   return {
@@ -150,12 +188,12 @@ export function esploraUrl(network) {
 export async function remainingBlocks(vault, network) {
   const url = esploraUrl(network);
   const explorer = new EsploraExplorer({ url });
-  const { Discovery } = DiscoveryFactory(explorer);
+  const { Discovery } = DiscoveryFactory(explorer, network);
   await explorer.connect();
   const discovery = new Discovery();
-  const expressions = `addr(${vault.triggerAddress})`;
-  await discovery.discover({ expressions, network, gapLimit: 3 });
-  const history = discovery.getHistory({ expressions, network });
+  const descriptor = `addr(${vault.triggerAddress})`;
+  await discovery.fetch({ descriptor, gapLimit: 3 });
+  const history = discovery.getHistory({ descriptor });
   const triggerBlockHeight = (history.length && history[0].blockHeight) || 0;
   const blockHeight = await explorer.fetchBlockHeight();
   await explorer.close();

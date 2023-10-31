@@ -28,13 +28,16 @@ const network = networks.testnet;
 
 import { generateMnemonic, mnemonicToSeedSync } from "bip39";
 import * as secp256k1 from "@bitcoinerlab/secp256k1";
-import * as descriptors from "@bitcoinerlab/descriptors";
-const { wpkhBIP32 } = descriptors.scriptExpressions;
+import {
+  scriptExpressions,
+  DescriptorsFactory,
+} from "@bitcoinerlab/descriptors";
+const { wpkhBIP32 } = scriptExpressions;
 
 import { EsploraExplorer } from "@bitcoinerlab/explorer";
 import { DiscoveryFactory } from "@bitcoinerlab/discovery";
 
-const { Descriptor, BIP32 } = descriptors.DescriptorsFactory(secp256k1);
+const { Output, BIP32 } = DescriptorsFactory(secp256k1);
 const DEF_PANIC_ADDR = "tb1qm0k9mn48uqfs2w9gssvzmus4j8srrx5eje7wpf";
 const DEF_LOCK_BLOCKS = String(6 * 24 * 7);
 import { createVault, esploraUrl, remainingBlocks } from "./vaults";
@@ -43,10 +46,10 @@ import styles from "./styles";
 const fromMnemonic = memoize((mnemonic) => {
   if (!mnemonic) throw new Error("mnemonic not passed");
   const masterNode = BIP32.fromSeed(mnemonicToSeedSync(mnemonic), network);
-  const expressions = [0, 1].map((change) =>
+  const descriptors = [0, 1].map((change) =>
     wpkhBIP32({ masterNode, network, account: 0, index: "*", change }),
   );
-  return { masterNode, external: expressions[0], internal: expressions[1] };
+  return { masterNode, external: descriptors[0], internal: descriptors[1] };
 });
 
 export default function App() {
@@ -68,7 +71,7 @@ export default function App() {
     const defLockBlocks = await AsyncStorage.getItem("defLockBlocks");
     const url = esploraUrl(network);
     const explorer = new EsploraExplorer({ url });
-    const { Discovery } = DiscoveryFactory(explorer);
+    const { Discovery } = DiscoveryFactory(explorer, network);
     await explorer.connect();
     const discovery = new Discovery();
     const vaults = JSON.parse((await AsyncStorage.getItem("vaults")) || "{}");
@@ -110,13 +113,13 @@ export default function App() {
   const handleCheckBalance = async () => {
     if (!checkingBalance) {
       setCheckingBalance(true);
-      const expressions = [
+      const descriptors = [
         fromMnemonic(mnemonic).external,
         fromMnemonic(mnemonic).internal,
       ];
       //if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
-      await discovery.discover({ expressions, network, gapLimit: 3 });
-      const { utxos, balance } = discovery.getUtxos({ expressions, network });
+      await discovery.fetch({ descriptors, gapLimit: 3 });
+      const { utxos, balance } = discovery.getUtxosAndBalance({ descriptors });
       setUtxos(utxos.length ? utxos : null);
       setBalance(balance);
 
@@ -138,9 +141,9 @@ export default function App() {
 
   const handleReceiveBitcoin = async () => {
     const external = fromMnemonic(mnemonic).external;
-    const index = discovery.getNextIndex({ expression: external, network });
-    const descriptor = new Descriptor({ expression: external, index, network });
-    setReceiveAddress(descriptor.getAddress());
+    const index = discovery.getNextIndex({ descriptor: external });
+    const output = new Output({ descriptor: external, index, network });
+    setReceiveAddress(output.getAddress());
   };
 
   const handleUnvault = async (vault) => {
@@ -214,9 +217,9 @@ Handle with care. Confidentiality is key.
   const handleVaultFunds = async ({ panicAddr, lockBlocks }) => {
     const masterNode = fromMnemonic(mnemonic).masterNode;
     const internal = fromMnemonic(mnemonic).internal;
-    const nextInternalAddress = new Descriptor({
-      expression: internal,
-      index: discovery.getNextIndex({ expression: internal, network }),
+    const nextInternalAddress = new Output({
+      descriptor: internal,
+      index: discovery.getNextIndex({ descriptor: internal }),
       network,
     }).getAddress();
     const vault = createVault({

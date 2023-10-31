@@ -44,11 +44,6 @@ npm install bip39 bip68\
 ```
 
 ```bash
-npm run updatelocalexplorer
-npm run updatelocaldiscovery
-```
-
-```bash
 #QR codes
 npm install react-native-qrcode-svg
 npx expo install react-native-svg
@@ -70,11 +65,10 @@ Create init.js and import it from App.js
 
 
 ```javascript
-    await discovery.discover({
-      expressions: `addr(${vaultAddress})`,
-      network,
-      onUsed: (expression) =>
-        console.log(`vault address in the chain: ${expression}`),
+    await discovery.fetch({
+      descriptor: `addr(${vaultAddress})`,
+      onUsed: (descriptor) =>
+        console.log(`vault address in the chain: ${descriptor}`),
     });
 ```
 
